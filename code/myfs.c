@@ -18,6 +18,7 @@
 // The one and only fcb that this implmentation will have. We'll keep it in
 // memory. A better
 // implementation would, at the very least, cache it's root directroy in memory.
+uuid_t root_uuid;
 myfcb the_root_fcb;
 unqlite_int64 root_object_size_value = sizeof(myfcb);
 
@@ -47,7 +48,7 @@ int getFCBFromPath(const char *path, myfcb *returnFCB) {
         return -ENOENT;
       }
       dirent dirValue[count];
-
+      nBytes = sizeof(dirent) * count;
       result = unqlite_kv_fetch(pDb, value.file_data_id, KEY_SIZE, dirValue,
                                 &nBytes);
       if (result != UNQLITE_OK)
@@ -65,6 +66,7 @@ int getFCBFromPath(const char *path, myfcb *returnFCB) {
       }
       if (!found)
         return -ENOENT;
+      nBytes = sizeof(myfcb);
       result = unqlite_kv_fetch(pDb, dirValue[index].referencedFCB, KEY_SIZE,
                                 &value, &nBytes);
     }
@@ -101,9 +103,11 @@ static int myfs_getattr(const char *path, struct stat *stbuf) {
     myfcb curr;
     memset(&curr, 0, sizeof(myfcb));
     int res = getFCBFromPath(path, &curr);
-    if (res < 0)
+    if (res < 0) {
+      write_log("Stat did not find %s ", path);
       return -ENOENT;
-
+    }
+    write_log("Stat found: %s ", path);
     // if (curr.name)
     stbuf->st_mode = curr.mode;
     stbuf->st_nlink = 1;
@@ -119,29 +123,88 @@ static int myfs_getattr(const char *path, struct stat *stbuf) {
   }
   return 0;
 }
+
+int getParentUUID(uuid_t *uuid, const char *path) {
+  char copy[strlen(path) + 1];
+  strcpy(copy, path);
+
+  char *parentDir = dirname(copy);
+  char parentCpy[strlen(parentDir) + 1];
+  strcpy(parentCpy, parentDir);
+  char *parentName = basename(parentCpy);
+  write_log("Parent Name is %s \n",parentName);
+  char *parentDirOfParentDir = dirname(parentDir);
+  write_log("Parents Parent is %s \n",parentDirOfParentDir);
+  if (strcmp(parentName,"/") == 0) {
+    // TOFIX
+    write_log("get Parent UUID copies the root Object key %s \n", ROOT_OBJECT_KEY);
+    uuid_copy(*uuid, ROOT_OBJECT_KEY);
+    write_log("New Root Object is %s\n",*uuid);
+    return 0;
+  }
+  myfcb parParFCB;
+  int result = 0;
+  int retVal = getFCBFromPath(parentDirOfParentDir, &parParFCB);
+  if (retVal < 0)
+    return -1;
+  int count = (parParFCB.size) / sizeof(dirent);
+  // if the root directory does not contain any files;
+  if (count == 0) {
+    return -ENOENT;
+  }
+  unqlite_int64 nBytes = parParFCB.size;
+  dirent dirValue[count];
+  nBytes = sizeof(dirent) * count;
+  result = unqlite_kv_fetch(pDb, parParFCB.file_data_id, KEY_SIZE, dirValue,
+                            &nBytes);
+  if (result != UNQLITE_OK)
+    return -ENOENT;
+
+  for (int i = 0; i < count; i++) {
+    if (strcmp(dirValue[i].name, parentName) == 0) {
+      uuid_copy(*uuid, dirValue[i].referencedFCB);
+      return 0;
+    }
+  }
+  return -1;
+}
+
 // Create a directory.
 // Read 'man 2 mkdir'.
 int myfs_mkdir(const char *path, mode_t mode) {
   write_log("myfs_mkdir: %s\n", path);
+  bool isRoot = false;
+  char copy[strlen(path) + 1];
+  strcpy(copy, path);
   mode |= S_IFDIR;
   int rc;
   uuid_t parUUID;
-  unqlite_int64 nBytes;
-
-//TODO
-  rc = getParentUuid(path, &parUUID);
-  if (rc < 0)
+  unqlite_int64 nBytes = sizeof(myfcb);
+  char *name = basename(copy);
+  strcpy(copy, path);
+  rc = getParentUUID(&parUUID, path);
+  write_log("mkdir GETS THE PARENT UUID the parent uuid is %s\n",parUUID);
+  // if (rc ==5)
+  if (rc < 0) {
     return -ENOENT;
-
+  }
+  bool updateCacheRoot = false;
+  if (uuid_compare(parUUID,ROOT_OBJECT_KEY) ==0){
+    updateCacheRoot =true;
+  }
   myfcb parentFCB;
+  nBytes = sizeof(myfcb);
+  write_log("uuid is %s length of the key is %d nBytes is %d\n",parUUID,KEY_SIZE,nBytes );
   rc = unqlite_kv_fetch(pDb, parUUID, KEY_SIZE, &parentFCB, &nBytes);
-  if (rc != UNQLITE_OK) return -1;
+  if (rc != UNQLITE_OK) {
+    write_log("Fetch Seems to be failing\n");
+    return -1;
+  }
+  write_log("mkdir Fetches the Parent UUID \n");
 
+  // Size of 0 represents that the directory does not contain any values
   myfcb newFCB;
-  //Size of 0 represents that the directory does not contain any values
-  uuid_t newBlock;
-  uuid_clear(newBlock);
-  uuid_copy(newFCB.file_data_id,newBlock);
+  uuid_copy(newFCB.file_data_id, zero_uuid);
   newFCB.size = 0;
   newFCB.ctime = time(NULL);
   newFCB.mtime = time(NULL);
@@ -150,28 +213,44 @@ int myfs_mkdir(const char *path, mode_t mode) {
   newFCB.gid = getgid();
   uuid_t uid;
   uuid_generate(uid);
-  rc = unqlite_kv_store(pDb, uid, ROOT_OBJECT_KEY_SIZE, &newFCB, sizeof(myfcb));
-  if (rc != UNQLITE_OK)
+  rc = unqlite_kv_store(pDb, uid, KEY_SIZE, &newFCB, sizeof(myfcb));
+  if (rc != UNQLITE_OK) {
     return -1;
+  }
+  write_log("mkdir stores the new FCB\n");
 
-  //TODO
-  char* name = getName(path);
   dirent newDirent;
-  newDirent.name = name;
-  newDirent.referencedFCB = newFCB;
+  strcpy(newDirent.name, name);
+  uuid_copy(newDirent.referencedFCB, uid);
 
   uuid_t direntUUID;
   if (parentFCB.size == 0) {
     uuid_generate(direntUUID);
-    uuid_copy(parentFCB.file_data_id,direntUUID);
+    uuid_copy(parentFCB.file_data_id, direntUUID);
+    if (updateCacheRoot == true){
+      uuid_copy(the_root_fcb.file_data_id,direntUUID);
+    }
   } else {
-      uuid_copy(direntUUID,parentFCB.file_data_id);
+    uuid_copy(direntUUID, parentFCB.file_data_id);
   }
 
-  rc = unqlite_kv_append(pDb,direntUUID,KEY_SIZE,&newDirent,sizeof(dirent));
+  rc = unqlite_kv_append(pDb, direntUUID, KEY_SIZE, &newDirent, sizeof(dirent));
+  if (rc != UNQLITE_OK) {
+    return -ENOENT;
+  }
 
   parentFCB.size += sizeof(dirent);
-  int retVal = unqlite_kv_store(pDb,parUUID,KEY_SIZE,&parentFCB,sizeof(myfcb));
+  if (isRoot) {
+    the_root_fcb.size += sizeof(dirent);
+  }
+  if (updateCacheRoot == true){
+    the_root_fcb.size += sizeof(dirent);
+  }
+  int retVal =
+      unqlite_kv_store(pDb, parUUID, KEY_SIZE, &parentFCB, sizeof(myfcb));
+  if (rc != UNQLITE_OK) {
+    return -ENOENT;
+  }
   return 0;
 }
 
@@ -200,21 +279,27 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   filler(buf, "..", NULL, 0);
 
   // TODO
-  myfcb test;
-
-  if (!S_ISDIR(test.mode))
-    return -1;
-  int res = getFCBFromPath(path, &test);
-  if (res < 0) {
+  myfcb directory;
+  //
+  // if (!S_ISDIR(test.mode))
+  //   return -1;
+    write_log("readdir is a directory\n");
+  int result = getFCBFromPath(path, &directory);
+  if (result < 0) {
     return -ENOENT;
   }
-
-  int count;
+  int count = directory.size / sizeof(dirent);
   if (count == 0)
     return 0;
-  int result;
-  dirent dirents[count];
-  unqlite_int64 nBytes;
+  unqlite_int64 nBytes = sizeof(dirent) * count;
+
+    dirent dirents[count];
+  result = unqlite_kv_fetch(pDb, directory.file_data_id, KEY_SIZE, &dirents,
+                            &nBytes);
+  if (result != UNQLITE_OK)
+    return -ENOENT;
+
+  nBytes = sizeof(myfcb);
   for (int i = 0; i < count; i++) {
     myfcb loop;
     result = unqlite_kv_fetch(pDb, dirents[i].referencedFCB, KEY_SIZE, &loop,
@@ -311,7 +396,7 @@ static int myfs_create(const char *path, mode_t mode,
   the_root_fcb.gid = context->gid;
   the_root_fcb.mode = mode | S_IFREG;
 
-  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                             &the_root_fcb, sizeof(myfcb));
   if (rc != UNQLITE_OK) {
     write_log("myfs_create - EIO");
@@ -334,7 +419,7 @@ static int myfs_utime(const char *path, struct utimbuf *ubuf) {
   the_root_fcb.mtime = ubuf->modtime;
 
   // Write the fcb to the store.
-  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                             &the_root_fcb, sizeof(myfcb));
   if (rc != UNQLITE_OK) {
     write_log("myfs_write - EIO");
@@ -403,7 +488,7 @@ static int myfs_write(const char *path, const char *buf, size_t size,
   the_root_fcb.ctime = now;
 
   // Write the fcb to the store.
-  rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+  rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                         &the_root_fcb, sizeof(myfcb));
   if (rc != UNQLITE_OK) {
     write_log("myfs_write - EIO");
@@ -428,7 +513,7 @@ int myfs_truncate(const char *path, off_t newsize) {
   the_root_fcb.size = newsize;
 
   // Write the fcb to the store.
-  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+  int rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                             &the_root_fcb, sizeof(myfcb));
   if (rc != UNQLITE_OK) {
     write_log("myfs_write - EIO");
@@ -512,6 +597,7 @@ static int myfs_open(const char *path, struct fuse_file_info *fi) {
 static struct fuse_operations myfs_oper = {
     .getattr = myfs_getattr,
     .readdir = myfs_readdir,
+    .mkdir = myfs_mkdir,
     .open = myfs_open,
     .read = myfs_read,
     .create = myfs_create,
@@ -530,21 +616,17 @@ static struct fuse_operations myfs_oper = {
 void init_fs() {
   int rc;
   printf("init_fs\n");
-  // Initialise the store.
-
-  uuid_clear(zero_uuid);
-
   // Open the database.
   rc = unqlite_open(&pDb, DATABASE_NAME, UNQLITE_OPEN_CREATE);
   if (rc != UNQLITE_OK)
     error_handler(rc);
 
-  unqlite_int64 nBytes; // Data length
+  unqlite_int64 nBytes = sizeof(myfcb); // Data length
 
   // Try to fetch the root element
   // The last parameter is a pointer to a variable which will hold the number of
   // bytes actually read
-  rc = unqlite_kv_fetch(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+  rc = unqlite_kv_fetch(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                         &the_root_fcb, &nBytes);
 
   // if it doesn't exist, we need to create one and put it into the database.
@@ -567,7 +649,7 @@ void init_fs() {
 
     // Write the root FCB
     printf("init_fs: writing root fcb\n");
-    rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, ROOT_OBJECT_KEY_SIZE,
+    rc = unqlite_kv_store(pDb, ROOT_OBJECT_KEY, KEY_SIZE,
                           &the_root_fcb, sizeof(myfcb));
 
     if (rc != UNQLITE_OK)

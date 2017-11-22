@@ -10,6 +10,7 @@
 #include <time.h>
 #include <fuse.h>
 #include <stdbool.h>
+#include <libgen.h>
 #define MY_MAX_PATH 100
 #define MY_MAX_FILE_SIZE 1000
 
@@ -55,8 +56,8 @@ typedef struct entry{
 extern unqlite_int64 root_object_size_value;
 
 // We need to use a well-known value as a key for the root object.
-#define ROOT_OBJECT_KEY "root"
-#define ROOT_OBJECT_KEY_SIZE 4
+#define ROOT_OBJECT_KEY "MyNameIsPenguin"
+// #define ROOT_OBJECT_KEY_SIZE 16
 
 // This is the size of a regular key used to fetch things from the
 // database. We use uuids as keys, so 16 bytes each
