@@ -75,7 +75,7 @@ int main(void){
   char* dir = dirname(str);
   printf("THE DIR IS %s\n",dir );
   char* twoDir = dirname(dir);
-  printf("2 dir is %s\n",twoDir );
+  printf("2 dir is %s\n",twoDir);
   char* threeDir = dirname(twoDir);
   printf("3 dir is %s\n",threeDir );
   char* basenamer = basename(threeDir);

@@ -323,6 +323,78 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   return 0;
 }
 
+// Delete a directory.
+// Read 'man 2 rmdir'.
+int myfs_rmdir(const char *path) {
+  write_log("myfs_rmdir: %s\n", path);
+  char copy [strlen(path) +1];
+  strcpy(copy,path);
+  char* rmDir = basename(copy);
+  uuid_t parUUID;
+  int result = getParentUUID(&parUUID,path);
+  myfcb parFCB;
+  unqlite_int64 nBytes= sizeof(myfcb);
+  result = unqlite_kv_fetch(pDb,parUUID,KEY_SIZE,&parFCB,&nBytes);
+  if (result != UNQLITE_OK || nBytes != sizeof(myfcb)){
+    write_log("The unqlite fetch of the parent fcb failed\n");
+    return result;
+  }
+  bool isRoot = false;
+  if (uuid_compare(ROOT_OBJECT_KEY,parUUID) ==0){
+    isRoot = true;
+  }
+
+  int count = parFCB.size/sizeof(dirent);
+
+  if (count ==0){
+    return -ENOENT;
+  } else {
+    nBytes = sizeof(dirent) * count;
+
+    dirent dirents[count];
+    result = unqlite_kv_fetch(pDb, parFCB.file_data_id, KEY_SIZE, &dirents,
+                             &nBytes);
+    if (result != UNQLITE_OK || nBytes != (sizeof(dirent) * count))return -ENOENT;
+    if (count ==1){
+      result = unqlite_kv_delete(pDb,parFCB.file_data_id,KEY_SIZE);
+      if (result != UNQLITE_OK){
+        return -1;
+      }
+      uuid_copy(parFCB.file_data_id,zero_uuid);
+      if (isRoot == true){
+        uuid_copy(the_root_fcb.file_data_id,zero_uuid);
+      }
+    } else {
+      int index  =0;
+      for (int i =0;i < count;i++){
+        if (strcmp(rmDir,dirents[i].name) ==0) {
+          index = i;
+          break;
+        }
+      }
+      if (index != (count-1)){
+        strcpy(dirents[index].name,dirents[count-1].name);
+        uuid_copy(dirents[index].referencedFCB,dirents[count-1].referencedFCB);
+      }
+      result = unqlite_kv_store(pDb,parFCB.file_data_id,KEY_SIZE,&dirents,sizeof(dirent) *(count -1));
+      if (result != UNQLITE_OK) return -1;
+    }
+    if (isRoot == true){
+      the_root_fcb.size -= sizeof(dirent);
+    }
+    parFCB.size -= sizeof(dirent);
+    nBytes = sizeof(myfcb);
+    result = unqlite_kv_store(pDb,parUUID,KEY_SIZE,&parFCB,sizeof(myfcb));
+    if (result != UNQLITE_OK || nBytes != sizeof(myfcb)) return -1;
+  }
+  //TODO
+  //Remove the Record from the parent
+  //Delete the record
+
+  return 0;
+}
+
+
 // Read a file.
 // Read 'man 2 read'.
 static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
@@ -547,13 +619,6 @@ int myfs_unlink(const char *path) {
   return 0;
 }
 
-// Delete a directory.
-// Read 'man 2 rmdir'.
-int myfs_rmdir(const char *path) {
-  write_log("myfs_rmdir: %s\n", path);
-
-  return 0;
-}
 
 // OPTIONAL - included as an example
 // Flush any cached data.
@@ -598,6 +663,7 @@ static struct fuse_operations myfs_oper = {
     .getattr = myfs_getattr,
     .readdir = myfs_readdir,
     .mkdir = myfs_mkdir,
+    .rmdir = myfs_rmdir,
     .open = myfs_open,
     .read = myfs_read,
     .create = myfs_create,
