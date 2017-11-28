@@ -1,0 +1,33 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	0	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+FUSE_USE_VERSION	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^#define FUSE_USE_VERSION /;"	macro	line:10	file:
+root_uuid	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^uuid_t root_uuid;$/;"	variable	line:21
+the_root_fcb	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^myfcb the_root_fcb;$/;"	variable	line:22
+root_object_size_value	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^unqlite_int64 root_object_size_value = sizeof(myfcb);$/;"	variable	line:23
+pDb	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^unqlite *pDb;$/;"	variable	line:26
+zero_uuid	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^uuid_t zero_uuid;$/;"	variable	line:27
+getFCBFromPath	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int getFCBFromPath(const char *path, myfcb *returnFCB) {$/;"	function	line:29	signature:(const char *path, myfcb *returnFCB)
+myfs_getattr	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_getattr(const char *path, struct stat *stbuf) {$/;"	function	line:87	file:	signature:(const char *path, struct stat *stbuf)
+getParentUUID	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int getParentUUID(uuid_t *uuid, const char *path) {$/;"	function	line:127	signature:(uuid_t *uuid, const char *path)
+myfs_mkdir	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_mkdir(const char *path, mode_t mode) {$/;"	function	line:174	signature:(const char *path, mode_t mode)
+myfs_readdir	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,$/;"	function	line:259	file:	signature:(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+myfs_rmdir	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_rmdir(const char *path) {$/;"	function	line:301	signature:(const char *path)
+myfs_read	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_read(const char *path, char *buf, size_t size, off_t offset,$/;"	function	line:389	file:	signature:(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+myfs_create	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_create(const char *path, mode_t mode,$/;"	function	line:466	file:	signature:(const char *path, mode_t mode, struct fuse_file_info *fi)
+myfs_utime	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_utime(const char *path, struct utimbuf *ubuf) {$/;"	function	line:557	file:	signature:(const char *path, struct utimbuf *ubuf)
+myfs_write	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_write(const char *path, const char *buf, size_t size,$/;"	function	line:625	file:	signature:(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+myfs_truncate	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_truncate(const char *path, off_t newsize) {$/;"	function	line:739	signature:(const char *path, off_t newsize)
+myfs_chmod	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_chmod(const char *path, mode_t mode) {$/;"	function	line:836	signature:(const char *path, mode_t mode)
+myfs_chown	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_chown(const char *path, uid_t uid, gid_t gid) {$/;"	function	line:888	signature:(const char *path, uid_t uid, gid_t gid)
+myfs_unlink	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_unlink(const char *path) {$/;"	function	line:940	signature:(const char *path)
+myfs_flush	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_flush(const char *path, struct fuse_file_info *fi) {$/;"	function	line:1034	signature:(const char *path, struct fuse_file_info *fi)
+myfs_release	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int myfs_release(const char *path, struct fuse_file_info *fi) {$/;"	function	line:1044	signature:(const char *path, struct fuse_file_info *fi)
+myfs_open	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static int myfs_open(const char *path, struct fuse_file_info *fi) {$/;"	function	line:1056	file:	signature:(const char *path, struct fuse_file_info *fi)
+myfs_oper	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^static struct fuse_operations myfs_oper = {$/;"	variable	line:1071	typeref:struct:fuse_operations	file:
+init_fs	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^void init_fs() {$/;"	function	line:1093
+shutdown_fs	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^void shutdown_fs() { unqlite_close(pDb); }$/;"	function	line:1145
+main	/cs/home/jk218/Documents/Filesystem/code/myfs.c	/^int main(int argc, char *argv[]) {$/;"	function	line:1147	signature:(int argc, char *argv[])
